@@ -1,0 +1,165 @@
+@import './assets/fonts/bamini28.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    font-size: 16px;
+    font-family: 'Plus Jakarta Sans', 'Anek Tamil', system-ui, sans-serif;
+  }
+
+  body {
+    overscroll-behavior-y: contain;
+  }
+
+  /* Accessible min-height for touch targets */
+  button, input, select, a {
+    min-height: 44px;
+  }
+}
+
+/* Custom pulse animations & outdoor readability */
+.touch-target {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+/* Ultra Modern Red & Gold Effects for VARTHAGAM */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #FFF5B8 0%, #F59E0B 45%, #D97706 75%, #FDE68A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+}
+
+.text-gold-shimmer {
+  background: linear-gradient(90deg, #F59E0B 0%, #FEF08A 50%, #D97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-crimson-gradient {
+  background: linear-gradient(135deg, #EF4444 0%, #B91C1C 60%, #7F1D1D 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.bg-gold-gradient {
+  background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 50%, #D97706 100%);
+  color: #451a03;
+}
+
+.bg-gold-gradient:hover {
+  background: linear-gradient(135deg, #FDE68A 0%, #FBBF24 50%, #D97706 100%);
+}
+
+.bg-crimson-gradient {
+  background: linear-gradient(135deg, #991B1B 0%, #7F1D1D 50%, #450A0A 100%);
+}
+
+.bg-crimson-card {
+  background: linear-gradient(145deg, #881337 0%, #7F1D1D 40%, #1E1B4B 100%);
+}
+
+.gold-border-glow {
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.2);
+}
+
+.crimson-border-glow {
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  box-shadow: 0 0 16px rgba(220, 38, 38, 0.25);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-panel-dark {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Stylish Tamil typography class */
+.font-tamil-varthagam {
+  font-family: 'Anek Tamil', 'Noto Sans Tamil', sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* Authentic Bamini 28 stylish Tamil font (tu;j;jfk;) */
+.font-bamini-varthagam {
+  font-family: 'BaminiTamil28', 'Anek Tamil', sans-serif;
+  letter-spacing: 0.04em;
+}
+
+/* Shimmer light sweep animation across gold text */
+@keyframes goldShimmerSweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-gold-shimmer {
+  background: linear-gradient(
+    90deg,
+    #F59E0B 0%,
+    #FFF5B8 25%,
+    #FEF08A 50%,
+    #F59E0B 75%,
+    #D97706 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: goldShimmerSweep 2.5s infinite linear;
+}
+
+/* Pulsing golden aura glow */
+@keyframes auraPulse {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.3), inset 0 0 15px rgba(245, 158, 11, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 45px rgba(245, 158, 11, 0.6), inset 0 0 25px rgba(245, 158, 11, 0.4);
+    transform: scale(1.02);
+  }
+}
+
+.animate-aura-pulse {
+  animation: auraPulse 2.8s infinite ease-in-out;
+}
+
+/* Slow rotate for royal coin rays */
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spinSlow 25s linear infinite;
+}
+
+/* Print styling for invoices and report cards */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
