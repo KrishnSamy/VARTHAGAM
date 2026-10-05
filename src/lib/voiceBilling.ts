@@ -169,6 +169,21 @@ export function parseTamilSpeechToItems(
     if (cleanPhrase.includes('பொங்கல்') || cleanPhrase.includes('pongal')) {
       return menuItems.find(i => i.nameTa.includes('பொங்கல்') || i.nameEn.toLowerCase().includes('pongal'));
     }
+    if (cleanPhrase.includes('சாப்பாடு') || cleanPhrase.includes('சாப்பாடு') || cleanPhrase.includes('meals') || cleanPhrase.includes('lunch') || cleanPhrase.includes('சாதம்')) {
+      return menuItems.find(i => i.nameTa.includes('சாப்பாடு') || i.nameTa.includes('சாதம்') || i.nameEn.toLowerCase().includes('meal') || i.nameEn.toLowerCase().includes('rice'));
+    }
+    if (cleanPhrase.includes('பரோட்டா') || cleanPhrase.includes('பரோட்ட') || cleanPhrase.includes('புரோட்டா') || cleanPhrase.includes('parotta')) {
+      return menuItems.find(i => i.nameTa.includes('பரோட்டா') || i.nameEn.toLowerCase().includes('parotta'));
+    }
+    if (cleanPhrase.includes('சப்பாத்தி') || cleanPhrase.includes('chapati') || cleanPhrase.includes('roti')) {
+      return menuItems.find(i => i.nameTa.includes('சப்பாத்தி') || i.nameEn.toLowerCase().includes('chapati'));
+    }
+    if (cleanPhrase.includes('பிரியாணி') || cleanPhrase.includes('biryani') || cleanPhrase.includes('briyani')) {
+      return menuItems.find(i => i.nameTa.includes('பிரியாணி') || i.nameEn.toLowerCase().includes('biryani'));
+    }
+    if (cleanPhrase.includes('தயிர்') || cleanPhrase.includes('curd')) {
+      return menuItems.find(i => i.nameTa.includes('தயிர்') || i.nameEn.toLowerCase().includes('curd'));
+    }
 
     return undefined;
   };

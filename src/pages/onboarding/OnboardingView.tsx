@@ -369,6 +369,7 @@ export const OnboardingView: React.FC = () => {
                         placeholder={t.shopNamePlaceholder}
                         value={shopName}
                         onChange={e => setShopName(e.target.value)}
+                        style={{ color: '#000000', WebkitTextFillColor: '#000000', backgroundColor: '#ffffff', caretColor: '#000000' }}
                         className="w-full p-3.5 rounded-xl border-2 border-slate-300 bg-white text-slate-900 font-bold focus:border-brand-500 focus:outline-none"
                       />
                     </div>
@@ -383,6 +384,7 @@ export const OnboardingView: React.FC = () => {
                         placeholder={t.upiIdPlaceholder}
                         value={upiId}
                         onChange={e => setUpiId(e.target.value)}
+                        style={{ color: '#000000', WebkitTextFillColor: '#000000', backgroundColor: '#ffffff', caretColor: '#000000' }}
                         className="w-full p-3.5 rounded-xl border-2 border-slate-300 bg-white text-slate-900 font-mono font-bold text-sm focus:border-brand-500 focus:outline-none"
                       />
                       <span className="text-[11px] text-slate-400 mt-1 block">{t.upiHelp}</span>
@@ -437,6 +439,7 @@ export const OnboardingView: React.FC = () => {
                         placeholder="••••"
                         value={pin}
                         onChange={e => setPin(e.target.value.replace(/[^0-9]/g, ''))}
+                        style={{ color: '#000000', WebkitTextFillColor: '#000000', backgroundColor: '#ffffff', caretColor: '#000000' }}
                         className="w-full p-4 rounded-xl border-2 border-slate-300 bg-white text-slate-900 text-center tracking-[1em] text-2xl font-black focus:border-brand-500 focus:outline-none shadow-sm"
                       />
                     </div>
@@ -452,6 +455,7 @@ export const OnboardingView: React.FC = () => {
                         placeholder="••••"
                         value={confirmPin}
                         onChange={e => setConfirmPin(e.target.value.replace(/[^0-9]/g, ''))}
+                        style={{ color: '#000000', WebkitTextFillColor: '#000000', backgroundColor: '#ffffff', caretColor: '#000000' }}
                         className="w-full p-4 rounded-xl border-2 border-slate-300 bg-white text-slate-900 text-center tracking-[1em] text-2xl font-black focus:border-brand-500 focus:outline-none shadow-sm"
                       />
                     </div>
@@ -502,7 +506,8 @@ export const OnboardingView: React.FC = () => {
                         type="text"
                         value={shopCode}
                         onChange={e => setShopCode(e.target.value.toUpperCase())}
-                        className="bg-transparent font-mono text-xl font-black text-gold-gradient focus:outline-none w-40"
+                        style={{ color: '#fbbf24', WebkitTextFillColor: '#fbbf24', caretColor: '#fbbf24' }}
+                        className="bg-transparent font-mono text-xl font-black text-amber-400 focus:outline-none w-40"
                         title="Edit Shop Code if given by Admin"
                       />
                       <button
@@ -538,6 +543,7 @@ export const OnboardingView: React.FC = () => {
                       placeholder="VTK-XXXX-YYYY"
                       value={uniqueKey}
                       onChange={e => setUniqueKey(e.target.value.toUpperCase())}
+                      style={{ color: '#000000', WebkitTextFillColor: '#000000', backgroundColor: '#ffffff', caretColor: '#000000' }}
                       className="w-full p-3.5 rounded-xl border-2 border-amber-500 font-mono font-black text-center text-lg uppercase tracking-wider focus:border-brand-600 focus:outline-none bg-white text-slate-900 shadow-sm"
                     />
                   </div>
@@ -664,6 +670,7 @@ export const OnboardingView: React.FC = () => {
                   value={loginCode}
                   onChange={e => setLoginCode(e.target.value.toUpperCase())}
                   required
+                  style={{ color: '#000000', WebkitTextFillColor: '#000000', backgroundColor: '#ffffff', caretColor: '#000000' }}
                   className="w-full p-3.5 rounded-xl border-2 border-slate-300 bg-white text-slate-900 font-mono font-black text-base focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-none uppercase shadow-sm"
                 />
               </div>
@@ -678,6 +685,7 @@ export const OnboardingView: React.FC = () => {
                   value={loginKey}
                   onChange={e => setLoginKey(e.target.value.toUpperCase())}
                   required
+                  style={{ color: '#000000', WebkitTextFillColor: '#000000', backgroundColor: '#ffffff', caretColor: '#000000' }}
                   className="w-full p-3.5 rounded-xl border-2 border-slate-300 bg-white text-slate-900 font-mono font-black text-base focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-none uppercase tracking-wider shadow-sm"
                 />
               </div>
@@ -692,6 +700,7 @@ export const OnboardingView: React.FC = () => {
                   placeholder="••••"
                   value={loginPin}
                   onChange={e => setLoginPin(e.target.value.replace(/[^0-9]/g, ''))}
+                  style={{ color: '#000000', WebkitTextFillColor: '#000000', backgroundColor: '#ffffff', caretColor: '#000000' }}
                   className="w-full p-3.5 rounded-xl border-2 border-slate-300 bg-white text-slate-900 text-center tracking-[0.5em] text-xl font-black focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-none shadow-sm"
                 />
               </div>

@@ -45,10 +45,10 @@ export const OrdersQueueView: React.FC = () => {
   useEffect(() => {
     loadOrders();
 
-    // Local interval to check for incoming kiosk orders
+    // Local interval to check for incoming orders (10s battery-friendly interval)
     const localPollInterval = setInterval(() => {
       loadOrders();
-    }, 2000);
+    }, 10000);
 
     // If Tier 1 Cloud Relay is active, subscribe to incoming cloud orders
     let unsubscribeRelay: (() => void) | undefined;

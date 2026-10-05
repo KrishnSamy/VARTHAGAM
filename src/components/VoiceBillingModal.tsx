@@ -12,6 +12,9 @@ import {
   Minus,
   Trash2,
   RotateCcw,
+  Send,
+  Keyboard,
+  Check,
 } from 'lucide-react';
 import { MenuItem } from '../db/db';
 import {
@@ -40,14 +43,15 @@ export const VoiceBillingModal: React.FC<Props> = ({
   language,
 }) => {
   const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [manualSpeechText, setManualSpeechText] = useState('');
   const [detectedItems, setDetectedItems] = useState<RecognizedVoiceItem[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [micStatusMsg, setMicStatusMsg] = useState<string | null>(null);
 
   const recognitionRef = useRef<any>(null);
 
-  // Initialize Speech Recognition
+  // Initialize Speech Recognition on Open
   useEffect(() => {
     if (!isOpen) {
       stopListening();
@@ -55,20 +59,22 @@ export const VoiceBillingModal: React.FC<Props> = ({
       return;
     }
 
-    setTranscript('');
+    setManualSpeechText('');
     setDetectedItems([]);
-    setErrorMsg(null);
+    setMicStatusMsg(null);
 
-    if (!isSpeechRecognitionSupported()) {
-      setErrorMsg(
+    const supported = isSpeechRecognitionSupported();
+    setSpeechSupported(supported);
+
+    if (supported) {
+      startListening();
+    } else {
+      setMicStatusMsg(
         language === 'ta'
-          ? 'உங்கள் உலாவியில் குரல் அறிதல் (Speech Recognition) ஆதரிக்கப்படவில்லை.'
-          : 'Voice speech recognition is not supported in this browser.'
+          ? 'குறிப்பு: உங்கள் போனில் தமிழ் விசைப்பலகை (Gboard Mic 🎤) அல்லது கீழே உள்ள விரைவு பட்டன்களைப் பயன்படுத்தலாம்.'
+          : 'Note: You can use your mobile keyboard Tamil Mic 🎤 or tap the quick speech buttons below.'
       );
-      return;
     }
-
-    startListening();
 
     return () => {
       stopListening();
@@ -82,7 +88,17 @@ export const VoiceBillingModal: React.FC<Props> = ({
         (window as any).SpeechRecognition ||
         (window as any).webkitSpeechRecognition;
 
-      if (!SpeechRecognitionClass) return;
+      if (!SpeechRecognitionClass) {
+        setSpeechSupported(false);
+        return;
+      }
+
+      // Stop previous instance if running
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {}
+      }
 
       const recognition = new SpeechRecognitionClass();
       recognition.lang = 'ta-IN'; // Tamil (India)
@@ -91,8 +107,12 @@ export const VoiceBillingModal: React.FC<Props> = ({
 
       recognition.onstart = () => {
         setIsListening(true);
-        setErrorMsg(null);
-        feedback.vibrate(30);
+        setMicStatusMsg(
+          language === 'ta'
+            ? 'மைக் தயார்! பேசுங்கள் (எ.கா: 2 டீ, ஒரு வடை)...'
+            : 'Listening! Speak items (e.g. 2 Tea, 1 Vada)...'
+        );
+        feedback.vibrate(25);
       };
 
       recognition.onresult = (event: any) => {
@@ -101,19 +121,27 @@ export const VoiceBillingModal: React.FC<Props> = ({
           fullTranscript += event.results[i][0].transcript + ' ';
         }
         const clean = fullTranscript.trim();
-        setTranscript(clean);
-
-        // Millisecond parsing
-        const parsed = parseTamilSpeechToItems(clean, menuItems);
-        if (parsed.length > 0) {
-          setDetectedItems(parsed);
-          feedback.vibrate(20);
-        }
+        setManualSpeechText(clean);
+        handleParseText(clean);
       };
 
       recognition.onerror = (event: any) => {
-        if (event.error !== 'no-speech') {
-          console.warn('Speech recognition error:', event.error);
+        console.warn('Speech recognition warning:', event.error);
+        if (event.error === 'not-allowed') {
+          setMicStatusMsg(
+            language === 'ta'
+              ? 'மைக்ரோஃபோன் அனுமதி மறுக்கப்பட்டது. செட்டிங்ஸில் அனுமதிக்கவும் அல்லது கீழே உள்ள விரைவு பட்டன்களை அழுத்தவும்.'
+              : 'Microphone permission blocked. Enable in settings or use quick buttons below.'
+          );
+          setIsListening(false);
+        } else if (event.error === 'no-speech') {
+          // Expected in noisy room, keep active
+        } else {
+          setMicStatusMsg(
+            language === 'ta'
+              ? 'குரல் உள்ளீடு: கீழே உள்ள பெட்டியில் பேசலாம் அல்லது விரைவு பட்டன்களை அழுத்தவும்.'
+              : 'Voice Input: Speak via keyboard mic or tap quick buttons below.'
+          );
         }
       };
 
@@ -124,12 +152,9 @@ export const VoiceBillingModal: React.FC<Props> = ({
       recognitionRef.current = recognition;
       recognition.start();
     } catch (e: any) {
-      console.error(e);
-      setErrorMsg(
-        language === 'ta'
-          ? 'மைக்ரோஃபோன் அணுகல் அனுமதி தேவை.'
-          : 'Microphone permission needed.'
-      );
+      console.warn('Speech start error:', e);
+      setIsListening(false);
+      setSpeechSupported(false);
     }
   };
 
@@ -143,283 +168,389 @@ export const VoiceBillingModal: React.FC<Props> = ({
     setIsListening(false);
   };
 
-  const toggleListening = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
+  // Parses any Tamil spoken text into recognized items
+  const handleParseText = (text: string) => {
+    if (!text.trim()) return;
+    const parsed = parseTamilSpeechToItems(text, menuItems);
+    if (parsed.length > 0) {
+      setDetectedItems(prev => {
+        // Merge or replace
+        const map = new Map<string, RecognizedVoiceItem>();
+        // Add existing items
+        prev.forEach(p => map.set(p.item.id, p));
+        // Add or update new items
+        parsed.forEach(p => map.set(p.item.id, p));
+        return Array.from(map.values());
+      });
+      feedback.vibrate(25);
     }
   };
 
-  // Adjust item quantities
-  const updateItemQty = (index: number, delta: number) => {
+  // 1-Tap Quick Spoken Chip Trigger
+  const handleTapQuickPhrase = (phraseText: string) => {
+    setManualSpeechText(prev => (prev ? `${prev}, ${phraseText}` : phraseText));
+    handleParseText(phraseText);
+    feedback.vibrate(30);
+  };
+
+  // Add individual item directly
+  const handleAddDirectItem = (item: MenuItem, qty: number = 1) => {
     setDetectedItems(prev => {
-      const copy = [...prev];
-      const newQty = copy[index].qty + delta;
-      if (newQty <= 0) {
-        return copy.filter((_, i) => i !== index);
+      const existing = prev.find(p => p.item.id === item.id);
+      if (existing) {
+        return prev.map(p =>
+          p.item.id === item.id ? { ...p, qty: p.qty + qty } : p
+        );
       }
-      copy[index] = { ...copy[index], qty: newQty };
-      return copy;
+      return [...prev, { item, qty }];
     });
+    feedback.vibrate(30);
+  };
+
+  // Adjust item quantity
+  const handleAdjustQty = (itemId: string, delta: number) => {
+    setDetectedItems(prev =>
+      prev
+        .map(p => {
+          if (p.item.id === itemId) {
+            const nextQty = p.qty + delta;
+            return nextQty > 0 ? { ...p, qty: nextQty } : null;
+          }
+          return p;
+        })
+        .filter((p): p is RecognizedVoiceItem => p !== null)
+    );
     feedback.vibrate(20);
   };
 
-  const removeItem = (index: number) => {
-    setDetectedItems(prev => prev.filter((_, i) => i !== index));
-    feedback.vibrate(25);
+  // Remove item
+  const handleRemoveItem = (itemId: string) => {
+    setDetectedItems(prev => prev.filter(p => p.item.id !== itemId));
+    feedback.vibrate(20);
   };
 
+  // Calculate Total in Paise
   const totalPaise = detectedItems.reduce(
-    (sum, r) => sum + r.item.pricePaise * r.qty,
+    (sum, d) => sum + d.item.pricePaise * d.qty,
     0
   );
 
-  const handleSpeakReadback = async () => {
+  // Play Tamil TTS voice confirmation
+  const handleSpeakConfirmation = async () => {
     if (detectedItems.length === 0) return;
     setIsSpeaking(true);
-    feedback.vibrate(40);
-    await speakTamilConfirmation(detectedItems, paiseToRupees(totalPaise));
-    setIsSpeaking(false);
+    feedback.vibrate(30);
+    try {
+      await speakTamilConfirmation(detectedItems, paiseToRupees(totalPaise));
+    } finally {
+      setIsSpeaking(false);
+    }
   };
 
-  const handleConfirmAndAdd = () => {
+  // Add all detected items to the main cart and close
+  const handleConfirmAndAdd = async () => {
     if (detectedItems.length === 0) return;
 
-    // Convert to cart items
-    const payload = detectedItems.map(d => ({
+    // Convert to cart line items
+    const itemsToAdd = detectedItems.map(d => ({
       id: d.item.id,
       qty: d.qty,
     }));
 
-    onAddItemsToCart(payload);
+    onAddItemsToCart(itemsToAdd);
     feedback.playPaymentSuccessTone();
-    feedback.vibrate(80);
+
+    // Optional audio confirmation
+    handleSpeakConfirmation();
+
+    stopListening();
     onClose();
   };
 
   if (!isOpen) return null;
 
+  // Prepare popular quick speech phrases
+  const popularPhrases = [
+    { text: '2 டீ', ta: '2 டீ', qty: 2, keyword: 'டீ' },
+    { text: '1 காபி', ta: '1 காபி', qty: 1, keyword: 'காபி' },
+    { text: '1 வடை', ta: '1 வடை', qty: 1, keyword: 'வடை' },
+    { text: '4 இட்லி', ta: '4 இட்லி', qty: 4, keyword: 'இட்லி' },
+    { text: '1 தோசை', ta: '1 தோசை', qty: 1, keyword: 'தோசை' },
+    { text: '1 பூரி', ta: '1 பூரி', qty: 1, keyword: 'பூரி' },
+    { text: '1 பார்சல் சாப்பாடு', ta: '1 சாப்பாடு', qty: 1, keyword: 'சாப்பாடு' },
+    { text: '2 சமோசா', ta: '2 சமோசா', qty: 2, keyword: 'சமோசா' },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 sm:p-4 animate-in fade-in">
-      <div className="w-full max-w-lg bg-gradient-to-b from-slate-900 via-rose-950/90 to-slate-950 border border-amber-500/40 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/85 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
+      <div className="w-full max-w-lg bg-slate-900 border border-amber-500/40 rounded-3xl shadow-2xl text-white flex flex-col max-h-[92vh] overflow-hidden">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-amber-500/20 flex items-center justify-between bg-black/40">
+        <div className="p-3.5 sm:p-4 bg-gradient-to-r from-red-950 via-brand-900 to-slate-900 border-b border-amber-500/30 flex justify-between items-center">
           <div className="flex items-center gap-2.5">
-            <span className="p-2 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-              <Sparkles className="w-5 h-5" />
-            </span>
+            <div
+              className={`w-9 h-9 rounded-2xl flex items-center justify-center font-black transition-all ${
+                isListening
+                  ? 'bg-red-600 text-white animate-pulse shadow-[0_0_15px_#dc2626]'
+                  : 'bg-gold-gradient text-slate-950 shadow-gold-sm'
+              }`}
+            >
+              <Mic className="w-5 h-5" />
+            </div>
             <div>
-              <h3 className="font-tamil-varthagam font-black text-lg sm:text-xl text-white">
+              <div className="flex items-center gap-1.5">
+                <h3 className="font-tamil-varthagam font-black text-base text-amber-200">
+                  {language === 'ta' ? 'AI குரல் பில்லிங் (Voice Billing)' : 'AI Voice Billing'}
+                </h3>
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/40">
+                  தமிழ்
+                </span>
+              </div>
+              <p className="text-[11px] text-stone-300">
                 {language === 'ta'
-                  ? 'AI உள்ளூர் குரல் வழி பில்லிங்'
-                  : 'AI Tamil Voice Billing'}
-              </h3>
-              <p className="text-[11px] text-amber-300 font-medium">
-                {language === 'ta'
-                  ? 'பொருட்களின் பெயரை தமிழில் பேசுங்கள் (எ.கா: "ரெண்டு டீ ஒரு மசால் வடை")'
-                  : 'Speak items in Tamil (e.g., "ரெண்டு டீ ஒரு வடை")'}
+                  ? 'தமிழில் பேசினால் நொடியில் பில் உருவகமாகும்'
+                  : 'Speak food items in Tamil for instant bill'}
               </p>
             </div>
           </div>
+
           <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition touch-target"
+            onClick={() => {
+              stopListening();
+              stopTamilSpeech();
+              onClose();
+            }}
+            className="p-1.5 text-stone-400 hover:text-white rounded-full hover:bg-white/10 touch-target transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
-          {/* Animated Mic & Waves */}
-          <div className="flex flex-col items-center justify-center py-4">
-            <button
-              onClick={toggleListening}
-              className={`relative w-24 h-24 sm:w-28 sm:h-28 rounded-full flex items-center justify-center transition-all duration-300 touch-target ${
-                isListening
-                  ? 'bg-gradient-to-tr from-rose-600 to-amber-500 shadow-crimson-lg scale-105 ring-4 ring-amber-400/50 animate-pulse'
-                  : 'bg-slate-800 border-2 border-slate-600 text-slate-400 hover:border-amber-400'
-              }`}
-            >
-              {isListening ? (
-                <>
-                  <span className="absolute inset-0 rounded-full bg-rose-500/30 animate-ping" />
-                  <Mic className="w-10 h-10 sm:w-12 sm:h-12 text-white relative z-10" />
-                </>
-              ) : (
-                <MicOff className="w-10 h-10 sm:w-12 sm:h-12" />
-              )}
-            </button>
+        {/* Scrollable Modal Body */}
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-3.5">
+          {/* Active Listening Mic Banner */}
+          <div className="p-3 rounded-2xl bg-slate-950 border border-amber-500/30 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => {
+                  if (isListening) {
+                    stopListening();
+                  } else {
+                    startListening();
+                  }
+                }}
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all touch-target ${
+                  isListening
+                    ? 'bg-rose-600 text-white animate-pulse shadow-[0_0_20px_#e11d48]'
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
+                }`}
+                title={isListening ? 'Stop Mic' : 'Start Mic'}
+              >
+                {isListening ? <Mic className="w-6 h-6 animate-bounce" /> : <MicOff className="w-5 h-5" />}
+              </button>
+              <div>
+                <p className="text-xs font-bold text-amber-200">
+                  {isListening
+                    ? (language === 'ta' ? 'மைக் இயங்குகிறது... பேசவும்' : 'Listening... Speak now')
+                    : (language === 'ta' ? 'மைக் தயாராக உள்ளது (தட்டவும்)' : 'Tap mic to start speaking')}
+                </p>
+                <p className="text-[10px] text-stone-400">
+                  {micStatusMsg || (language === 'ta' ? 'உதாரணம்: "2 டீ, ஒரு மசால் வடை"' : 'e.g. "2 Tea, 1 Vada"')}
+                </p>
+              </div>
+            </div>
 
-            <span className="mt-3 text-xs font-bold text-amber-300">
-              {isListening
-                ? language === 'ta'
-                  ? '🎙️ கேட்கிறது... பேசுங்கள்'
-                  : '🎙️ Listening... Speak now'
-                : language === 'ta'
-                ? 'பேச மைக் பட்டனை அழுத்தவும்'
-                : 'Tap mic to start speaking'}
-            </span>
+            {isListening && (
+              <span className="flex h-3 w-3 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+              </span>
+            )}
           </div>
 
-          {/* Transcript Box */}
-          {transcript && (
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 text-center">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                {language === 'ta' ? 'நீங்கள் பேசியது:' : 'Spoken Transcript:'}
+          {/* Real-time Voice / Gboard Mic Input Field (100% Android Compatible) */}
+          <div>
+            <label className="text-xs font-bold text-amber-200 flex items-center justify-between mb-1">
+              <span className="flex items-center gap-1">
+                <Keyboard className="w-3.5 h-3.5" />
+                <span>{language === 'ta' ? 'பேசிய உரை / விசைப்பலகை மைக் (🎤):' : 'Speech Transcript / Keyboard Mic:'}</span>
               </span>
-              <p className="font-tamil-varthagam text-sm sm:text-base text-amber-200 font-bold">
-                "{transcript}"
-              </p>
-            </div>
-          )}
+              <span className="text-[10px] text-stone-400 font-normal">Gboard mic supported</span>
+            </label>
 
-          {/* Error Notice */}
-          {errorMsg && (
-            <div className="bg-rose-500/20 border border-rose-500/40 rounded-2xl p-3 flex items-center gap-2 text-rose-300 text-xs">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{errorMsg}</span>
+            <div className="relative">
+              <input
+                type="text"
+                value={manualSpeechText}
+                onChange={e => {
+                  setManualSpeechText(e.target.value);
+                  handleParseText(e.target.value);
+                }}
+                placeholder={
+                  language === 'ta'
+                    ? 'இங்கு தமிழில் பேசவும் அல்லது தட்டச்சு செய்யவும்...'
+                    : 'Speak or type items here (e.g. 2 tea, 1 vada)...'
+                }
+                style={{
+                  color: '#000000',
+                  WebkitTextFillColor: '#000000',
+                  backgroundColor: '#ffffff',
+                  caretColor: '#000000',
+                }}
+                className="w-full p-3 pr-10 rounded-xl border-2 border-amber-400/80 bg-white text-slate-900 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 shadow-sm"
+              />
+              {manualSpeechText && (
+                <button
+                  onClick={() => {
+                    setManualSpeechText('');
+                    setDetectedItems([]);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-800 p-1 rounded-full touch-target"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
-          )}
+          </div>
 
-          {/* Recognized Items List */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                {language === 'ta' ? 'கண்டறியப்பட்ட பொருட்கள்' : 'Detected Items'} ({detectedItems.length})
+          {/* Quick Spoken-Items Chips Deck (விரைவு குரல் பட்டன்கள்) */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-bold text-stone-300">
+                {language === 'ta' ? 'விரைவு குரல் ஆர்டர்கள் (1-Tap Speak):' : 'Quick Voice Phrases:'}
               </span>
+              <span className="text-[10px] text-amber-400">நொடியில் சேர்க்க</span>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {popularPhrases.map((phrase, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleTapQuickPhrase(phrase.text)}
+                  className="bg-white/10 hover:bg-amber-500/20 active:scale-95 text-stone-200 hover:text-amber-200 border border-white/15 hover:border-amber-400/40 px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 touch-target"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-400" />
+                  <span>{phrase.ta}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Detected Items In Voice Bill */}
+          <div className="bg-slate-950/80 border border-amber-500/30 rounded-2xl p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5 text-xs font-black text-amber-200">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>
+                  {language === 'ta' ? 'அடையாளம் காணப்பட்ட பொருட்கள்' : 'Detected Food Items'} ({detectedItems.length})
+                </span>
+              </div>
               {detectedItems.length > 0 && (
                 <button
-                  onClick={handleSpeakReadback}
-                  disabled={isSpeaking}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-amber-300 hover:text-amber-200 bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/30 transition touch-target"
+                  onClick={() => setDetectedItems([])}
+                  className="text-[10px] text-rose-400 hover:text-rose-300 underline"
                 >
-                  <Volume2 className="w-3.5 h-3.5" />
-                  <span>
-                    {isSpeaking
-                      ? language === 'ta'
-                        ? 'பேசுகிறது...'
-                        : 'Speaking...'
-                      : language === 'ta'
-                      ? '🔊 தமிழில் கேட்க'
-                      : '🔊 Listen'}
-                  </span>
+                  {language === 'ta' ? 'அனைத்தையும் அழி' : 'Clear All'}
                 </button>
               )}
             </div>
 
             {detectedItems.length === 0 ? (
-              <div className="text-center py-6 border border-dashed border-white/10 rounded-2xl bg-white/5">
-                <p className="text-xs text-slate-400 font-tamil-varthagam">
+              <div className="py-6 text-center text-xs text-stone-400">
+                <p>{language === 'ta' ? 'பொருட்கள் இன்னும் கண்டறியப்படவில்லை.' : 'No items detected yet.'}</p>
+                <p className="text-[11px] text-amber-300/80 mt-1">
                   {language === 'ta'
-                    ? 'எடுத்துக்காட்டு: "ரெண்டு டீ, ஒரு காபி, அஞ்சு இட்லி"'
-                    : 'Example: "இரண்டு டீ, ஒரு காபி, அஞ்சு இட்லி"'}
+                    ? 'மைக்கில் பேசவும் அல்லது மேலே உள்ள விரைவு பட்டன்களை அழுத்தவும்.'
+                    : 'Speak into mic or tap quick speech chips above.'}
                 </p>
               </div>
             ) : (
-              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                {detectedItems.map((r, idx) => (
+              <div className="space-y-2">
+                {detectedItems.map(d => (
                   <div
-                    key={`${r.item.id}-${idx}`}
-                    className="flex items-center justify-between bg-white/10 border border-white/10 rounded-2xl p-2.5 sm:p-3"
+                    key={d.item.id}
+                    className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-2"
                   >
-                    <div className="flex items-center gap-2.5">
-                      {r.item.imageUrl ? (
-                        <img
-                          src={r.item.imageUrl}
-                          alt={r.item.nameTa}
-                          className="w-10 h-10 rounded-xl object-cover border border-amber-400/40"
-                        />
-                      ) : (
-                        <span className="text-2xl p-1 bg-amber-500/20 rounded-xl">
-                          {r.item.emoji}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{d.item.emoji || '🍽️'}</span>
                       <div>
-                        <h4 className="font-tamil-varthagam font-bold text-sm text-white leading-tight">
-                          {r.item.nameTa}
+                        <h4 className="font-tamil-varthagam font-bold text-xs text-stone-100">
+                          {language === 'ta' ? d.item.nameTa : d.item.nameEn}
                         </h4>
                         <span className="text-[11px] text-amber-300 font-mono">
-                          {formatPaise(r.item.pricePaise)} × {r.qty} ={' '}
-                          <span className="font-bold">
-                            {formatPaise(r.item.pricePaise * r.qty)}
-                          </span>
+                          {formatPaise(d.item.pricePaise)} × {d.qty} ={' '}
+                          <strong className="text-white">
+                            {formatPaise(d.item.pricePaise * d.qty)}
+                          </strong>
                         </span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1.5">
                       <button
-                        onClick={() => updateItemQty(idx, -1)}
-                        className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center touch-target"
+                        onClick={() => handleAdjustQty(d.item.id, -1)}
+                        className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center active:scale-95 touch-target"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="w-6 text-center font-black text-amber-400 text-sm">
-                        {r.qty}
+                      <span className="font-black text-xs text-amber-300 w-5 text-center">
+                        {d.qty}
                       </span>
                       <button
-                        onClick={() => updateItemQty(idx, 1)}
-                        className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center touch-target"
+                        onClick={() => handleAdjustQty(d.item.id, 1)}
+                        className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 font-bold flex items-center justify-center active:scale-95 touch-target shadow-sm"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => removeItem(idx)}
-                        className="w-7 h-7 rounded-lg text-rose-400 hover:bg-rose-500/20 flex items-center justify-center ml-1 touch-target"
+                        onClick={() => handleRemoveItem(d.item.id)}
+                        className="text-stone-400 hover:text-rose-400 p-1 ml-1 touch-target"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
                 ))}
+
+                {/* Total Summary */}
+                <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between">
+                  <span className="text-xs text-stone-300 font-bold">
+                    {language === 'ta' ? 'குரல் பில் மொத்தம்:' : 'Total Voice Bill:'}
+                  </span>
+                  <span className="text-lg font-black text-amber-300 font-mono">
+                    {formatPaise(totalPaise)}
+                  </span>
+                </div>
               </div>
             )}
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 sm:p-5 border-t border-amber-500/20 bg-black/60 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="w-full sm:w-auto text-left">
-            <span className="text-[10px] text-slate-400 uppercase font-bold block">
-              {language === 'ta' ? 'மொத்தத் தொகை' : 'Total Amount'}
-            </span>
-            <span className="text-xl sm:text-2xl font-black text-amber-400 font-display">
-              {formatPaise(totalPaise)}
-            </span>
-          </div>
+        <div className="p-3 sm:p-4 bg-slate-950 border-t border-amber-500/30 flex gap-2">
+          {/* Tamil TTS Audio Button */}
+          <button
+            onClick={handleSpeakConfirmation}
+            disabled={detectedItems.length === 0 || isSpeaking}
+            className="w-1/3 bg-white/10 hover:bg-white/20 text-amber-200 border border-amber-500/40 font-bold text-xs py-3 rounded-2xl flex items-center justify-center gap-1.5 touch-target active:scale-95 disabled:opacity-40 transition"
+            title="Tamil Voice Confirmation"
+          >
+            {isSpeaking ? <Volume2 className="w-4 h-4 animate-bounce" /> : <Volume2 className="w-4 h-4" />}
+            <span>{language === 'ta' ? 'குரல் உறுதி' : 'Voice Confirm'}</span>
+          </button>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              onClick={() => {
-                setTranscript('');
-                setDetectedItems([]);
-                startListening();
-              }}
-              className="py-3 px-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-300 font-bold text-xs flex items-center justify-center gap-1.5 touch-target"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>{language === 'ta' ? 'மீண்டும்' : 'Retry'}</span>
-            </button>
-
-            <button
-              onClick={handleConfirmAndAdd}
-              disabled={detectedItems.length === 0}
-              className={`flex-1 sm:flex-none py-3 px-6 rounded-2xl font-black text-xs shadow-gold-md flex items-center justify-center gap-2 transition touch-target ${
-                detectedItems.length > 0
-                  ? 'bg-gold-gradient text-slate-950 hover:brightness-105 active:scale-95'
-                  : 'bg-slate-700 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>
-                {language === 'ta'
-                  ? `உறுதிப்படுத்து & பில்லில் சேர் (${detectedItems.length})`
-                  : `Confirm & Add to Bill (${detectedItems.length})`}
-              </span>
-            </button>
-          </div>
+          {/* Confirm & Add to Cart Button */}
+          <button
+            onClick={handleConfirmAndAdd}
+            disabled={detectedItems.length === 0}
+            className="w-2/3 bg-gold-gradient text-slate-950 font-black text-xs sm:text-sm py-3 px-3 rounded-2xl shadow-gold-sm hover:brightness-105 active:scale-95 transition flex items-center justify-center gap-2 touch-target disabled:opacity-40"
+          >
+            <CheckCircle2 className="w-4 h-4 text-slate-950" />
+            <span>
+              {language === 'ta'
+                ? `பில்லில் சேர்க்க (${formatPaise(totalPaise)})`
+                : `Add to Bill (${formatPaise(totalPaise)})`}
+            </span>
+          </button>
         </div>
       </div>
     </div>

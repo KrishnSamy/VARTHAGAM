@@ -325,44 +325,44 @@ export const BillingView: React.FC = () => {
 
       {/* Floating Bottom Cart Bar */}
       {cartLines.length > 0 && (
-        <div className="fixed bottom-16 left-0 right-0 p-3 bg-slate-900/95 backdrop-blur-md border-t border-amber-500/30 shadow-2xl z-30 max-w-5xl mx-auto text-white animate-in slide-in-from-bottom">
-          <div className="flex items-center justify-between gap-3">
+        <div className="fixed bottom-[3.6rem] sm:bottom-16 left-0 right-0 p-2.5 sm:p-3 bg-slate-900/95 backdrop-blur-md border-t border-amber-500/30 shadow-2xl z-30 max-w-5xl mx-auto text-white animate-in slide-in-from-bottom">
+          <div className="flex items-center justify-between gap-2">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] bg-amber-400/20 text-amber-300 border border-amber-400/30 font-bold px-2 py-0.5 rounded-full">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] sm:text-[11px] bg-amber-400/20 text-amber-300 border border-amber-400/30 font-bold px-2 py-0.5 rounded-full">
                   {cartLines.reduce((s, i) => s + i.qty, 0)} {language === 'ta' ? 'பொருட்கள்' : 'items'}
                 </span>
                 <button
                   onClick={clearCart}
-                  className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-0.5 underline"
+                  className="text-[10px] sm:text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-0.5 underline"
                 >
                   <Trash2 className="w-3 h-3" />
                   <span>{t.clearCart}</span>
                 </button>
               </div>
-              <div className="text-2xl font-black text-amber-300 font-display mt-0.5">
+              <div className="text-xl sm:text-2xl font-black text-amber-300 font-display mt-0.5">
                 {formatPaise(totalPaise)}
               </div>
             </div>
 
             {/* Quick Cash & UPI Actions */}
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 sm:gap-2">
               <button
                 onClick={() => handleCheckout('cash')}
                 disabled={subscription?.isReadOnly}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-3 rounded-2xl shadow-md flex items-center gap-1.5 touch-target active:scale-95 disabled:opacity-50"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl shadow-md flex items-center gap-1 touch-target active:scale-95 disabled:opacity-50 text-xs sm:text-sm"
               >
-                <Banknote className="w-5 h-5" />
-                <span className="text-sm font-black">{language === 'ta' ? 'ரொக்கம்' : 'Cash'}</span>
+                <Banknote className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="font-black">{language === 'ta' ? 'ரொக்கம்' : 'Cash'}</span>
               </button>
 
               <button
                 onClick={() => handleCheckout('upi')}
                 disabled={subscription?.isReadOnly}
-                className="bg-gold-gradient text-slate-950 font-black px-4 py-3 rounded-2xl shadow-gold-sm hover:brightness-105 flex items-center gap-1.5 touch-target active:scale-95 disabled:opacity-50"
+                className="bg-gold-gradient text-slate-950 font-black px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl shadow-gold-sm hover:brightness-105 flex items-center gap-1 touch-target active:scale-95 disabled:opacity-50 text-xs sm:text-sm"
               >
-                <QrCode className="w-5 h-5" />
-                <span className="text-sm">UPI QR</span>
+                <QrCode className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>UPI QR</span>
               </button>
             </div>
           </div>

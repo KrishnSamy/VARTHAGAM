@@ -51,4 +51,29 @@ describe('Security & Owner Authentication Module', () => {
     expect(keyRes.success).toBe(true);
     expect(keyRes.method).toBe('unique_key');
   });
+
+  it('sanitizes malicious user inputs to prevent XSS attacks', async () => {
+    const { sanitizeInput } = await import('../src/lib/appSecurity');
+    expect(sanitizeInput('<script>alert("hack")</script>Tea')).toBe('alert("hack")Tea');
+    expect(sanitizeInput('javascript:alert(1)')).toBe('alert(1)');
+    expect(sanitizeInput('Clean Shop Name')).toBe('Clean Shop Name');
+  });
+
+  it('validates bill integrity and catches client-side price tampering', async () => {
+    const { verifyBillIntegrity } = await import('../src/lib/appSecurity');
+    const validLines = [
+      { pricePaise: 1000, qty: 2, totalPaise: 2000 },
+      { pricePaise: 1500, qty: 1, totalPaise: 1500 },
+    ];
+    expect(verifyBillIntegrity(validLines, 3500)).toBe(true);
+
+    // Tampered total
+    expect(verifyBillIntegrity(validLines, 1000)).toBe(false);
+
+    // Tampered line item
+    const tamperedLines = [
+      { pricePaise: 1000, qty: 2, totalPaise: 100 }, // artificially reduced
+    ];
+    expect(verifyBillIntegrity(tamperedLines, 100)).toBe(false);
+  });
 });

@@ -15,19 +15,49 @@
     overscroll-behavior-y: contain;
   }
 
-  /* Accessible min-height for touch targets */
-  button, input, select, a, textarea {
-    min-height: 44px;
-  }
-
   /* High contrast black text by default for all inputs so text is never white on light background */
   input, select, textarea {
-    color: #0f172a !important; /* Deep black / Slate 900 */
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    caret-color: #000000 !important;
   }
 
   input::placeholder, textarea::placeholder {
-    color: #94a3b8 !important; /* Slate 400 */
+    color: #64748b !important;
+    -webkit-text-fill-color: #64748b !important;
+    opacity: 0.75 !important;
   }
+}
+
+/* Universal Input Contrast Enforcement (bypasses layer ordering) */
+input:not([type="checkbox"]):not([type="radio"]):not(.bg-slate-950):not(.bg-slate-900):not(.bg-black):not(.bg-transparent):not(.text-white):not(.text-amber-200),
+select:not(.bg-slate-950):not(.bg-slate-900):not(.bg-black):not(.bg-transparent):not(.text-white):not(.text-amber-200),
+textarea:not(.bg-slate-950):not(.bg-slate-900):not(.bg-black):not(.bg-transparent):not(.text-white):not(.text-amber-200),
+input.bg-white,
+textarea.bg-white,
+select.bg-white {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  background-color: #ffffff !important;
+  caret-color: #000000 !important;
+}
+
+/* Explicit rule for dark-themed inputs */
+input.bg-slate-950,
+input.bg-slate-900,
+input.bg-black,
+textarea.bg-slate-950,
+textarea.bg-slate-900 {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #ffffff !important;
+}
+
+input:not([type="checkbox"]):not([type="radio"])::placeholder,
+textarea::placeholder {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+  opacity: 0.85 !important;
 }
 
 /* Custom pulse animations & outdoor readability */
@@ -132,20 +162,34 @@
   animation: goldShimmerSweep 2.5s infinite linear;
 }
 
-/* Pulsing golden aura glow */
+/* Mobile Safe Area & Android Fit Helpers */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}
+
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+
+.safe-nav-spacing {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.5rem);
+}
+
+/* Pulsing golden aura (Optimized for 0% CPU & Cool Battery) */
 @keyframes auraPulse {
   0%, 100% {
-    box-shadow: 0 0 25px rgba(245, 158, 11, 0.3), inset 0 0 15px rgba(245, 158, 11, 0.2);
     transform: scale(1);
+    opacity: 0.85;
   }
   50% {
-    box-shadow: 0 0 45px rgba(245, 158, 11, 0.6), inset 0 0 25px rgba(245, 158, 11, 0.4);
-    transform: scale(1.02);
+    transform: scale(1.03);
+    opacity: 1;
   }
 }
 
 .animate-aura-pulse {
-  animation: auraPulse 2.8s infinite ease-in-out;
+  animation: auraPulse 2.5s infinite ease-in-out;
+  will-change: transform, opacity;
 }
 
 /* Slow rotate for royal coin rays */
