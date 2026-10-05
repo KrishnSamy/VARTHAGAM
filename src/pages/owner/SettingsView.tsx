@@ -16,6 +16,9 @@ import {
   Edit3,
   Check,
   Key,
+  Sparkles,
+  Mic,
+  ExternalLink,
 } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
 import { db } from '../../db/db';
@@ -23,6 +26,7 @@ import { exportLocalBackupJson, restoreFromBackupSnapshot } from '../../lib/gdri
 import { feedback } from '../../lib/feedback';
 import { PinModal } from '../../components/PinModal';
 import { hashPin } from '../../lib/security';
+import { getSavedGeminiKey, saveGeminiKey, verifyGeminiKey } from '../../lib/voiceBilling';
 import QRCode from 'qrcode';
 
 interface Props {
@@ -56,6 +60,31 @@ export const SettingsView: React.FC<Props> = ({ onEnterKiosk, onNavigateToMenu }
   const [showChangePin, setShowChangePin] = useState(false);
   const [newPin, setNewPin] = useState('');
   const [pinChangeMsg, setPinChangeMsg] = useState('');
+
+  // AI Voice Billing Settings State
+  const [geminiApiKeyInput, setGeminiApiKeyInput] = useState(getSavedGeminiKey());
+  const [testingGeminiKey, setTestingGeminiKey] = useState(false);
+  const [geminiKeyMsg, setGeminiKeyMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  const handleVerifyAndSaveGeminiKey = async () => {
+    if (!geminiApiKeyInput.trim()) {
+      saveGeminiKey('');
+      setGeminiKeyMsg({ text: language === 'ta' ? 'API சாவி அகற்றப்பட்டது' : 'API Key removed', ok: false });
+      return;
+    }
+    setTestingGeminiKey(true);
+    setGeminiKeyMsg(null);
+    const res = await verifyGeminiKey(geminiApiKeyInput);
+    setTestingGeminiKey(false);
+    if (res.success) {
+      saveGeminiKey(geminiApiKeyInput);
+      setGeminiKeyMsg({ text: language === 'ta' ? '✅ சாவி வெற்றிகரமாக இணைக்கப்பட்டது!' : '✅ Key verified & saved!', ok: true });
+      feedback.playPaymentSuccessTone();
+    } else {
+      setGeminiKeyMsg({ text: `❌ ${res.message}`, ok: false });
+      feedback.vibrate(80);
+    }
+  };
 
   const handleToggleSelfBill = async () => {
     const nextVal = !isSelfBillOpen;
@@ -395,7 +424,88 @@ export const SettingsView: React.FC<Props> = ({ onEnterKiosk, onNavigateToMenu }
         </button>
       </div>
 
-      {/* 7. Local & Drive Backup Section */}
+      {/* 7. AI Voice Billing Settings (Google Gemini AI Studio Free API) */}
+      <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 text-brand-900">
+            <div className="w-9 h-9 rounded-2xl bg-amber-500/20 text-amber-600 flex items-center justify-center font-bold">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-black text-sm text-slate-800">
+                {language === 'ta' ? 'AI தமிழ் குரல் பில்லிங் (Google Gemini AI)' : 'AI Tamil Voice Billing (Google Gemini AI)'}
+              </h4>
+              <p className="text-xs text-slate-500">
+                {language === 'ta' ? '100% இலவச Google AI Studio API சாவி (15 RPM / 1500 req/day)' : '100% Free Gemini API key via Google AI Studio'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-xs text-slate-600 mb-3 leading-relaxed">
+          {language === 'ta'
+            ? 'வாடிக்கையாளர் அல்லது கடை உரிமையாளர் தமிழில் பேசும்போது, நொடியில் மெனுவில் உள்ள உணவுகளைத் துல்லியமாக அடையாளம் கண்டு பில் போடும் அதிநவீன AI தொழில்நுட்பம்.'
+            : 'Allows speaking food items in local colloquial Tamil for instant structured billing in milliseconds.'}
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="password"
+            placeholder="AIzaSy... (Gemini API Key)"
+            value={geminiApiKeyInput}
+            onChange={(e) => setGeminiApiKeyInput(e.target.value)}
+            className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs text-slate-800 font-mono placeholder:text-slate-400 focus:outline-none focus:border-brand-600"
+          />
+          <button
+            onClick={handleVerifyAndSaveGeminiKey}
+            disabled={testingGeminiKey}
+            className="bg-brand-900 hover:bg-brand-800 text-white font-bold px-4 py-2.5 rounded-2xl text-xs shadow-sm touch-target flex items-center justify-center gap-1.5 disabled:opacity-50"
+          >
+            {testingGeminiKey ? (
+              <span>{language === 'ta' ? 'சரிபார்க்கிறது...' : 'Testing...'}</span>
+            ) : (
+              <>
+                <Check className="w-4 h-4 text-amber-300" />
+                <span>{language === 'ta' ? 'சரிபார்த்து சேமி' : 'Verify & Save'}</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between mt-2.5 pt-1 text-xs">
+          <a
+            href="https://aistudio.google.com/app/apikey"
+            target="_blank"
+            rel="noreferrer"
+            className="text-brand-700 hover:text-brand-900 font-bold hover:underline flex items-center gap-1"
+          >
+            <span>{language === 'ta' ? '🔗 இலவச Google Gemini Key பெற (இங்கே தட்டவும்)' : '🔗 Get Free Gemini API Key (Google AI Studio)'}</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+          {geminiApiKeyInput && (
+            <button
+              onClick={() => {
+                setGeminiApiKeyInput('');
+                saveGeminiKey('');
+                setGeminiKeyMsg({ text: language === 'ta' ? 'சாவி நீக்கப்பட்டது' : 'Key removed', ok: false });
+              }}
+              className="text-rose-600 hover:underline text-[11px]"
+            >
+              {language === 'ta' ? 'சாவியை நீக்கு' : 'Remove Key'}
+            </button>
+          )}
+        </div>
+
+        {geminiKeyMsg && (
+          <div className={`mt-2.5 p-2.5 rounded-xl text-xs font-semibold ${
+            geminiKeyMsg.ok ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
+          }`}>
+            {geminiKeyMsg.text}
+          </div>
+        )}
+      </div>
+
+      {/* 8. Local & Drive Backup Section */}
       <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm mb-4">
         <div className="flex items-center gap-2 text-brand-800 mb-2">
           <HardDrive className="w-5 h-5" />

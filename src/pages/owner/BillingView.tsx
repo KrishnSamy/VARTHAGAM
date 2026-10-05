@@ -15,6 +15,7 @@ import {
   Download,
   X,
   FileText,
+  Loader2,
 } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
 import { db, MenuItem, OrderItemLine, OrderBill } from '../../db/db';
@@ -45,6 +46,21 @@ export const BillingView: React.FC = () => {
   const [lastCompletedOrder, setLastCompletedOrder] = useState<OrderBill | null>(null);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!lastCompletedOrder) return;
+    setIsGeneratingPdf(true);
+    try {
+      await generateLuxuryReceiptPdf(lastCompletedOrder, settings);
+      feedback.playPaymentSuccessTone();
+    } catch (e) {
+      console.error('PDF error:', e);
+      alert(language === 'ta' ? 'PDF உருவாக்கம் தோல்வி. மீண்டும் முயற்சிக்கவும்.' : 'Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   // Categories
   const categories = ['all', ...Array.from(new Set(items.map(i => i.category)))];
@@ -485,11 +501,21 @@ export const BillingView: React.FC = () => {
             {/* Actions: Download Luxury PDF / Next Bill */}
             <div className="space-y-2 mt-4">
               <button
-                onClick={() => generateLuxuryReceiptPdf(lastCompletedOrder, settings)}
-                className="w-full bg-gold-gradient text-slate-950 font-black py-3 rounded-xl shadow-gold-sm hover:brightness-105 transition flex items-center justify-center gap-2 text-xs touch-target"
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+                className="w-full bg-gold-gradient text-slate-950 font-black py-3 rounded-xl shadow-gold-sm hover:brightness-105 active:scale-95 transition flex items-center justify-center gap-2 text-xs touch-target disabled:opacity-60"
               >
-                <Download className="w-4 h-4 text-slate-950" />
-                <span>{language === 'ta' ? '📄 ஆடம்பர பில் PDF பதிவிறக்கு' : 'Download Luxury PDF'}</span>
+                {isGeneratingPdf ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                    <span>{language === 'ta' ? 'PDF தயாராகிறது...' : 'Generating PDF...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 text-slate-950" />
+                    <span>{language === 'ta' ? '📄 ஆடம்பர பில் PDF பதிவிறக்கு' : 'Download Luxury PDF'}</span>
+                  </>
+                )}
               </button>
 
               <button
