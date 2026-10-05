@@ -51,6 +51,7 @@ interface ShopContextType {
   // Item & Price Management
   updateItemPrice: (itemId: string, newPricePaise: number, reason?: string) => Promise<void>;
   addItem: (item: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  bulkAddItems: (items: Array<Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<void>;
   updateItem: (itemId: string, data: Partial<MenuItem>) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
   toggleItemAvailable: (itemId: string) => Promise<void>;
@@ -354,6 +355,18 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await refreshShopData();
   };
 
+  const bulkAddItems = async (itemsData: Array<Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>>) => {
+    const timestamp = Date.now();
+    const newItems: MenuItem[] = itemsData.map((item, idx) => ({
+      ...item,
+      id: `item_${timestamp}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }));
+    await db.items.bulkPut(newItems);
+    await refreshShopData();
+  };
+
   const updateItem = async (itemId: string, data: Partial<MenuItem>) => {
     await db.items.update(itemId, {
       ...data,
@@ -421,6 +434,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         getNextTokenNumber,
         updateItemPrice,
         addItem,
+        bulkAddItems,
         updateItem,
         deleteItem,
         toggleItemAvailable,

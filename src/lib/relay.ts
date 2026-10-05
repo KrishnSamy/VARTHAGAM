@@ -31,6 +31,7 @@ export interface RelayMenuItem {
 export interface RelayOrder {
   id?: string;
   token: string;
+  billNumber?: string;
   items: string; // JSON string of [{ itemId, qty }]
   payMode: 'cash' | 'upi';
   state: 'pending' | 'confirmed' | 'served' | 'cancelled';

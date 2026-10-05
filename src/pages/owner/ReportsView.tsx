@@ -8,6 +8,8 @@ import { PinModal } from '../../components/PinModal';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { KanakkuCharts, DailyTrendPoint } from '../../components/KanakkuCharts';
+import { generateLuxuryPnlPdf } from '../../lib/luxuryPdf';
 
 export const ReportsView: React.FC = () => {
   const { language, t, settings, subscription } = useShop();
@@ -25,6 +27,7 @@ export const ReportsView: React.FC = () => {
   const [expensesPaise, setExpensesPaise] = useState(0);
   const [billsCount, setBillsCount] = useState(0);
   const [categoryExpenses, setCategoryExpenses] = useState<Record<string, number>>({});
+  const [trendData, setTrendData] = useState<DailyTrendPoint[]>([]);
 
   useEffect(() => {
     if (isUnlocked) {
@@ -92,6 +95,38 @@ export const ReportsView: React.FC = () => {
     setExpensesPaise(totalOpExpenses);
     setBillsCount(orders.length);
     setCategoryExpenses(catMap);
+
+    // Calculate daily points for the interactive trend chart
+    const dateMap: Record<string, { sales: number; cogs: number; exp: number }> = {};
+    orders.forEach(o => {
+      if (!dateMap[o.dateKey]) dateMap[o.dateKey] = { sales: 0, cogs: 0, exp: 0 };
+      dateMap[o.dateKey].sales += o.totalPaise;
+    });
+    expenses.forEach(e => {
+      if (e.category !== 'owner_withdrawal') {
+        if (!dateMap[e.dateKey]) dateMap[e.dateKey] = { sales: 0, cogs: 0, exp: 0 };
+        dateMap[e.dateKey].exp += e.amountPaise;
+        if (e.category === 'raw_materials') {
+          dateMap[e.dateKey].cogs += e.amountPaise;
+        }
+      }
+    });
+
+    const sortedDates = Object.keys(dateMap).sort().slice(-7);
+    if (sortedDates.length > 0) {
+      const trendPts: DailyTrendPoint[] = sortedDates.map(dk => {
+        const d = dateMap[dk];
+        const estCogs = d.cogs || Math.round(d.sales * 0.4);
+        const estGp = d.sales - estCogs;
+        const net = estGp - (d.exp - estCogs);
+        return {
+          dateLabel: dk.slice(5),
+          salesPaise: d.sales,
+          profitPaise: net,
+        };
+      });
+      setTrendData(trendPts);
+    }
   };
 
   const grossProfitPaise = calculateGrossProfit(salesPaise, cogsPaise);
@@ -124,35 +159,23 @@ export const ReportsView: React.FC = () => {
     XLSX.writeFile(wb, `kadai_kanakku_${period}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const exportPdf = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text(settings?.name || 'Kadai Kanakku', 14, 20);
-    doc.setFontSize(12);
-    doc.text(`Profit & Loss Statement - ${period.toUpperCase()}`, 14, 28);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 35);
-
-    const tableData = [
-      ['Total Revenue', formatPaise(salesPaise)],
-      ['Cash Revenue', formatPaise(cashPaise)],
-      ['UPI Revenue', formatPaise(upiPaise)],
-      ['Cost of Goods (COGS)', formatPaise(cogsPaise)],
-      ['Gross Profit', formatPaise(grossProfitPaise)],
-      ['Operating Expenses', formatPaise(expensesPaise - cogsPaise)],
-      ['Net Profit / (Loss)', formatPaise(netProfitPaise)],
-      ['Gross Margin %', `${marginPct}%`],
-      ['Bills Count', `${billsCount}`],
-    ];
-
-    (doc as any).autoTable({
-      startY: 42,
-      head: [['Metric', 'Amount']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [21, 128, 61] },
-    });
-
-    doc.save(`kadai_kanakku_${period}.pdf`);
+  const exportPdf = async () => {
+    await generateLuxuryPnlPdf(
+      {
+        period,
+        salesPaise,
+        cashPaise,
+        upiPaise,
+        cogsPaise,
+        expensesPaise,
+        grossProfitPaise,
+        netProfitPaise,
+        marginPct,
+        billsCount,
+        categoryExpenses,
+      },
+      settings
+    );
   };
 
   const shareWhatsAppSummary = () => {
@@ -314,9 +337,24 @@ export const ReportsView: React.FC = () => {
           className="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold py-3 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs touch-target shadow-sm"
         >
           <Download className="w-4 h-4 text-rose-600" />
-          <span>PDF</span>
+          <span>{language === 'ta' ? 'அறிக்கை PDF' : 'PDF Report'}</span>
         </button>
       </div>
+
+      {/* Interactive Visual Charts & Infographics */}
+      <KanakkuCharts
+        salesPaise={salesPaise}
+        cashPaise={cashPaise}
+        upiPaise={upiPaise}
+        cogsPaise={cogsPaise}
+        expensesPaise={expensesPaise}
+        grossProfitPaise={grossProfitPaise}
+        netProfitPaise={netProfitPaise}
+        marginPct={marginPct}
+        categoryExpenses={categoryExpenses}
+        trendData={trendData}
+        language={language}
+      />
 
       {/* "How is this calculated?" Explainable Math Modal */}
       {showHowCalcModal && (

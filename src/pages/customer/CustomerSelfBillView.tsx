@@ -16,12 +16,15 @@ import {
   UtensilsCrossed,
   ShieldCheck,
   Flame,
+  Mic,
 } from 'lucide-react';
 import { db, MenuItem } from '../../db/db';
 import { formatPaise, paiseToRupees } from '../../lib/money';
 import { feedback } from '../../lib/feedback';
 import { relay, RelayPublicShop } from '../../lib/relay';
 import { VarthagamLogo } from '../../components/VarthagamLogo';
+import { VoiceBillingModal } from '../../components/VoiceBillingModal';
+import { generateBillNumber } from '../../lib/billUtils';
 import confetti from 'canvas-confetti';
 import QRCode from 'qrcode';
 
@@ -40,12 +43,14 @@ export const CustomerSelfBillView: React.FC<Props> = ({ shopCode }) => {
   const [payMode, setPayMode] = useState<'cash' | 'upi'>('upi');
   const [generatedToken, setGeneratedToken] = useState<string>('');
   const [generatedBillId, setGeneratedBillId] = useState<string>('');
+  const [generatedBillNumber, setGeneratedBillNumber] = useState<string>('');
   const [upiQrUrl, setUpiQrUrl] = useState<string>('');
   const [upiDeepLink, setUpiDeepLink] = useState<string>('');
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [language, setLanguage] = useState<'ta' | 'en'>('ta');
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [resetCountdown, setResetCountdown] = useState<number>(45);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
 
   useEffect(() => {
     loadShopAndMenu();
@@ -245,6 +250,16 @@ export const CustomerSelfBillView: React.FC<Props> = ({ shopCode }) => {
     }
   };
 
+  const handleAddVoiceItems = (voiceItems: { id: string; qty: number }[]) => {
+    setCart(prev => {
+      const copy = { ...prev };
+      for (const v of voiceItems) {
+        copy[v.id] = (copy[v.id] || 0) + v.qty;
+      }
+      return copy;
+    });
+  };
+
   // Poll until shop owner clicks "Approve & Generate Bill"
   const startPollingOrderStatus = (orderId: string, isLocal: boolean) => {
     const interval = setInterval(async () => {
@@ -254,6 +269,8 @@ export const CustomerSelfBillView: React.FC<Props> = ({ shopCode }) => {
           clearInterval(interval);
           setGeneratedToken(ord.tokenNumber);
           setGeneratedBillId(ord.id);
+          const billNo = ord.billNumber || generateBillNumber(shopCode, ord.tokenNumber);
+          setGeneratedBillNumber(billNo);
           setOrderState('confirmed');
           feedback.playPaymentSuccessTone();
           confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
@@ -262,8 +279,11 @@ export const CustomerSelfBillView: React.FC<Props> = ({ shopCode }) => {
         const ord = await relay.pollOrder(shopCode, orderId);
         if (ord && (ord.state === 'confirmed' || ord.state === 'served')) {
           clearInterval(interval);
-          setGeneratedToken(ord.token || 'T-OK');
+          const tok = ord.token || 'T-OK';
+          setGeneratedToken(tok);
           setGeneratedBillId(orderId);
+          const billNo = ord.billNumber || generateBillNumber(shopCode, tok);
+          setGeneratedBillNumber(billNo);
           setOrderState('confirmed');
           feedback.playPaymentSuccessTone();
           confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
@@ -350,6 +370,41 @@ export const CustomerSelfBillView: React.FC<Props> = ({ shopCode }) => {
         {/* State 1: Browsing Menu */}
         {orderState === 'browsing' && (
           <div>
+            {/* AI Tamil Voice Order Banner */}
+            <div className="mb-4 bg-gradient-to-r from-brand-900/90 via-rose-950/80 to-slate-900 border border-amber-500/30 rounded-3xl p-3.5 sm:p-4 text-white flex items-center justify-between gap-3 shadow-crimson-md">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowVoiceModal(true)}
+                  className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center text-white shadow-gold-sm hover:scale-105 active:scale-95 transition touch-target flex-shrink-0 animate-pulse"
+                >
+                  <Mic className="w-5 h-5" />
+                </button>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-tamil-varthagam font-black text-sm text-amber-300">
+                      {language === 'ta' ? '🎤 தமிழில் பேசி ஆர்டர் செய்யலாம்' : '🎤 Order with Tamil Voice'}
+                    </span>
+                    <span className="text-[9px] bg-rose-500/30 text-rose-300 px-1.5 py-0.5 rounded-full font-bold border border-rose-500/40">
+                      AI
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 line-clamp-1">
+                    {language === 'ta'
+                      ? '"ரெண்டு டீ, ஒரு வடை" என பேசினால் தானாகவே ஆர்டரில் சேரும்!'
+                      : 'Speak items in Tamil — auto added to your order!'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowVoiceModal(true)}
+                className="bg-gold-gradient text-slate-950 font-black px-3.5 py-2 rounded-xl text-xs shadow-gold-sm hover:brightness-105 transition flex items-center gap-1.5 touch-target flex-shrink-0"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{language === 'ta' ? 'பேசுக' : 'Speak'}</span>
+              </button>
+            </div>
+
             {/* Category Pills */}
             <div className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-none">
               {categoryKeys.map(cat => (
@@ -388,9 +443,13 @@ export const CustomerSelfBillView: React.FC<Props> = ({ shopCode }) => {
                     }`}
                   >
                     <div>
-                      {/* Food Icon with radiant circle */}
-                      <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-amber-500/20 to-brand-700/20 border border-amber-500/30 flex items-center justify-center text-3xl mb-3 shadow-inner">
-                        {item.emoji || '☕'}
+                      {/* Food Image / Icon */}
+                      <div className="w-16 h-16 mx-auto rounded-2xl overflow-hidden border border-amber-500/40 flex items-center justify-center mb-3 shadow-inner bg-black/30">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.nameTa} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-3xl">{item.emoji || '☕'}</span>
+                        )}
                       </div>
 
                       <h3 className="font-tamil-varthagam font-bold text-slate-100 text-sm sm:text-base leading-tight">
@@ -653,8 +712,16 @@ export const CustomerSelfBillView: React.FC<Props> = ({ shopCode }) => {
 
             {/* Official Receipt Breakdown */}
             <div className="bg-slate-950/70 rounded-2xl p-4 border border-slate-800 text-left mb-6 text-xs">
-              <div className="flex justify-between text-slate-400 pb-2 border-b border-slate-800">
-                <span>{shopPublic?.name}</span>
+              <div className="flex justify-between items-center text-slate-400 pb-2 border-b border-slate-800">
+                <div>
+                  <span className="font-bold text-white block">{shopPublic?.name}</span>
+                  <span className="text-[11px] font-mono text-amber-300">
+                    {language === 'ta' ? 'பில் எண்:' : 'Bill:'}{' '}
+                    <span className="font-bold text-white">
+                      {generatedBillNumber || generateBillNumber(shopCode, generatedToken)}
+                    </span>
+                  </span>
+                </div>
                 <span className="font-mono">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
               <div className="py-2 space-y-1">
@@ -725,6 +792,15 @@ export const CustomerSelfBillView: React.FC<Props> = ({ shopCode }) => {
           </div>
         </div>
       )}
+
+      {/* AI Voice Billing Modal */}
+      <VoiceBillingModal
+        isOpen={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
+        menuItems={items}
+        onAddItemsToCart={handleAddVoiceItems}
+        language={language}
+      />
     </div>
   );
 };

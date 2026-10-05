@@ -16,8 +16,17 @@
   }
 
   /* Accessible min-height for touch targets */
-  button, input, select, a {
+  button, input, select, a, textarea {
     min-height: 44px;
+  }
+
+  /* High contrast black text by default for all inputs so text is never white on light background */
+  input, select, textarea {
+    color: #0f172a !important; /* Deep black / Slate 900 */
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: #94a3b8 !important; /* Slate 400 */
   }
 }
 

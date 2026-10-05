@@ -15,12 +15,14 @@ import {
   XCircle,
   Coffee,
   ArrowLeft,
+  Upload,
 } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
 import { MenuItem } from '../../db/db';
 import { formatPaise, rupeesToPaise, paiseToRupees } from '../../lib/money';
 import { feedback } from '../../lib/feedback';
 import { PinModal } from '../../components/PinModal';
+import { BulkItemUploadModal } from '../../components/BulkItemUploadModal';
 
 interface Props {
   onBack?: () => void;
@@ -47,6 +49,7 @@ export const MenuManagementView: React.FC<Props> = ({ onBack }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showQuickPriceModal, setShowQuickPriceModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
   // Search & Filter
@@ -252,6 +255,20 @@ export const MenuManagementView: React.FC<Props> = ({ onBack }) => {
           )}
 
           <button
+            onClick={() => {
+              if (!isOwnerUnlocked) {
+                setIsPinModalOpen(true);
+                return;
+              }
+              setShowBulkUploadModal(true);
+            }}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3.5 py-2.5 rounded-2xl text-xs shadow-md transition flex items-center gap-1.5 touch-target active:scale-95"
+          >
+            <Upload className="w-4 h-4" />
+            <span>{language === 'ta' ? '📦 50 பொருட்கள் சேர்' : '📦 Bulk Add 50'}</span>
+          </button>
+
+          <button
             onClick={handleOpenAdd}
             className="bg-brand-600 hover:bg-brand-500 text-white font-bold px-4 py-2.5 rounded-2xl text-xs shadow-md transition flex items-center gap-1.5 touch-target active:scale-95"
           >
@@ -274,19 +291,35 @@ export const MenuManagementView: React.FC<Props> = ({ onBack }) => {
           />
         </div>
 
-        <button
-          onClick={() => {
-            if (!isOwnerUnlocked) {
-              setIsPinModalOpen(true);
-              return;
-            }
-            setShowBulkModal(true);
-          }}
-          className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold px-4 py-2.5 rounded-2xl text-xs shadow-sm flex items-center justify-center gap-1.5 transition touch-target"
-        >
-          <TrendingUp className="w-4 h-4 text-amber-700" />
-          <span>{language === 'ta' ? 'மொத்த விலை மாற்றம்' : 'Bulk Price Update'}</span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              if (!isOwnerUnlocked) {
+                setIsPinModalOpen(true);
+                return;
+              }
+              setShowBulkUploadModal(true);
+            }}
+            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold px-3 py-2.5 rounded-2xl text-xs shadow-sm flex items-center justify-center gap-1.5 transition touch-target"
+          >
+            <Upload className="w-4 h-4 text-emerald-700" />
+            <span>{language === 'ta' ? 'மொத்தப் பதிவேற்றம் (50)' : 'Bulk Upload (50)'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (!isOwnerUnlocked) {
+                setIsPinModalOpen(true);
+                return;
+              }
+              setShowBulkModal(true);
+            }}
+            className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold px-3 py-2.5 rounded-2xl text-xs shadow-sm flex items-center justify-center gap-1.5 transition touch-target"
+          >
+            <TrendingUp className="w-4 h-4 text-amber-700" />
+            <span>{language === 'ta' ? 'விலை மாற்றம்' : 'Price Update'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Category Pills */}
@@ -329,9 +362,17 @@ export const MenuManagementView: React.FC<Props> = ({ onBack }) => {
           >
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex items-center gap-2.5">
-                <span className="text-3xl p-2 rounded-2xl bg-amber-50 border border-amber-100 flex-shrink-0">
-                  {item.emoji}
-                </span>
+                {item.imageUrl ? (
+                  <img
+                    src={item.imageUrl}
+                    alt={item.nameTa}
+                    className="w-12 h-12 rounded-2xl object-cover border border-amber-300 flex-shrink-0 shadow-sm"
+                  />
+                ) : (
+                  <span className="text-3xl p-2 rounded-2xl bg-amber-50 border border-amber-100 flex-shrink-0">
+                    {item.emoji}
+                  </span>
+                )}
                 <div>
                   <h4 className="font-tamil-varthagam font-bold text-base text-slate-900 leading-tight">
                     {language === 'ta' ? item.nameTa : item.nameEn}
@@ -783,6 +824,12 @@ export const MenuManagementView: React.FC<Props> = ({ onBack }) => {
           feedback.playPaymentSuccessTone();
         }}
         onCancel={() => setIsPinModalOpen(false)}
+      />
+
+      {/* Bulk Item Upload Modal (Up to 50 Items) */}
+      <BulkItemUploadModal
+        isOpen={showBulkUploadModal}
+        onClose={() => setShowBulkUploadModal(false)}
       />
     </div>
   );

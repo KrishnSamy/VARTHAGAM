@@ -10,11 +10,19 @@ import {
   Printer,
   AlertTriangle,
   ShoppingBag,
+  Mic,
+  Sparkles,
+  Download,
+  X,
+  FileText,
 } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
-import { db, MenuItem, OrderItemLine } from '../../db/db';
+import { db, MenuItem, OrderItemLine, OrderBill } from '../../db/db';
 import { formatPaise, paiseToRupees } from '../../lib/money';
 import { feedback } from '../../lib/feedback';
+import { VoiceBillingModal } from '../../components/VoiceBillingModal';
+import { generateBillNumber } from '../../lib/billUtils';
+import { generateLuxuryReceiptPdf } from '../../lib/luxuryPdf';
 import confetti from 'canvas-confetti';
 import QRCode from 'qrcode';
 
@@ -34,7 +42,9 @@ export const BillingView: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [showUpiModal, setShowUpiModal] = useState(false);
   const [upiQrDataUrl, setUpiQrDataUrl] = useState<string>('');
-  const [lastCompletedOrder, setLastCompletedOrder] = useState<any | null>(null);
+  const [lastCompletedOrder, setLastCompletedOrder] = useState<OrderBill | null>(null);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
   // Categories
   const categories = ['all', ...Array.from(new Set(items.map(i => i.category)))];
@@ -87,6 +97,16 @@ export const BillingView: React.FC = () => {
 
   const totalPaise = cartLines.reduce((sum, line) => sum + line.totalPaise, 0);
 
+  const handleAddVoiceItems = (voiceItems: { id: string; qty: number }[]) => {
+    setCart(prev => {
+      const copy = { ...prev };
+      for (const v of voiceItems) {
+        copy[v.id] = (copy[v.id] || 0) + v.qty;
+      }
+      return copy;
+    });
+  };
+
   const handleCheckout = async (chosenPayMode: 'cash' | 'upi') => {
     if (cartLines.length === 0 || subscription?.isReadOnly) return;
 
@@ -111,10 +131,12 @@ export const BillingView: React.FC = () => {
     try {
       const tokenNumber = await getNextTokenNumber();
       const todayStr = new Date().toISOString().split('T')[0];
+      const billNumber = generateBillNumber(settings?.shopCode, tokenNumber);
 
-      const newOrder = {
+      const newOrder: OrderBill = {
         id: `ord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         tokenNumber,
+        billNumber,
         items: cartLines,
         totalPaise,
         payMode: confirmedPayMode,
@@ -139,6 +161,7 @@ export const BillingView: React.FC = () => {
       } catch (err) {}
 
       setLastCompletedOrder(newOrder);
+      setShowReceiptModal(true);
       setCart({});
       setShowUpiModal(false);
       await refreshShopData();
@@ -160,6 +183,41 @@ export const BillingView: React.FC = () => {
           </span>
         </div>
       )}
+
+      {/* AI Voice Billing Banner */}
+      <div className="mb-4 bg-gradient-to-r from-brand-900 via-rose-950 to-slate-900 border border-amber-500/30 rounded-3xl p-3.5 sm:p-4 text-white flex items-center justify-between gap-3 shadow-crimson-md">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowVoiceModal(true)}
+            className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center text-white shadow-gold-sm hover:scale-105 active:scale-95 transition touch-target flex-shrink-0 animate-pulse"
+          >
+            <Mic className="w-6 h-6" />
+          </button>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-tamil-varthagam font-black text-sm sm:text-base text-amber-300">
+                {language === 'ta' ? '🎤 AI உள்ளூர் குரல் பில்லிங்' : '🎤 AI Local Voice Billing'}
+              </span>
+              <span className="text-[10px] bg-rose-500/30 text-rose-300 px-2 py-0.5 rounded-full font-bold border border-rose-500/40">
+                LIVE
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-300 line-clamp-1">
+              {language === 'ta'
+                ? 'டீ, காபி, வடை என தமிழில் பேசினால் நொடியில் பில் போடலாம்!'
+                : 'Speak food items in Tamil to auto-add to bill in milliseconds!'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowVoiceModal(true)}
+          className="bg-gold-gradient text-slate-950 font-black px-4 py-2.5 rounded-2xl text-xs shadow-gold-sm hover:brightness-105 transition flex items-center gap-1.5 touch-target flex-shrink-0"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>{language === 'ta' ? 'பேசுக' : 'Speak'}</span>
+        </button>
+      </div>
 
       {/* Category Filter Pills */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-3 scrollbar-none">
@@ -209,7 +267,17 @@ export const BillingView: React.FC = () => {
 
               {/* Item Content */}
               <div className="text-center py-1">
-                <div className="text-3xl sm:text-4xl mb-1.5">{item.emoji || '🍽️'}</div>
+                <div className="flex justify-center mb-1.5">
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.nameTa}
+                      className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border border-amber-300 shadow-sm"
+                    />
+                  ) : (
+                    <div className="text-3xl sm:text-4xl py-1">{item.emoji || '🍽️'}</div>
+                  )}
+                </div>
                 <h4 className="font-tamil-varthagam font-bold text-slate-800 text-sm leading-tight line-clamp-2">
                   {language === 'ta' ? item.nameTa : item.nameEn}
                 </h4>
@@ -345,6 +413,90 @@ export const BillingView: React.FC = () => {
                 className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition touch-target text-xs"
               >
                 {t.cancel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Voice Billing Modal */}
+      <VoiceBillingModal
+        isOpen={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
+        menuItems={items}
+        onAddItemsToCart={handleAddVoiceItems}
+        language={language}
+      />
+
+      {/* Completed Bill Luxury Receipt Modal */}
+      {showReceiptModal && lastCompletedOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="w-full max-w-sm rounded-3xl bg-slate-900 border-2 border-amber-400 p-6 shadow-2xl text-white relative">
+            <button
+              onClick={() => setShowReceiptModal(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-white/10"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="text-center mb-4">
+              <span className="text-[11px] font-bold text-amber-300 uppercase tracking-widest bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30">
+                {language === 'ta' ? 'அதிகாரப்பூர்வ பில்' : 'Official Receipt'}
+              </span>
+              <h3 className="font-tamil-varthagam font-black text-xl text-white mt-2">
+                {settings?.name || 'Varthagam'}
+              </h3>
+              <p className="text-xs font-mono text-amber-300">
+                {language === 'ta' ? 'பில் எண்:' : 'Bill No:'}{' '}
+                <span className="font-bold text-white">
+                  {lastCompletedOrder.billNumber || generateBillNumber(settings?.shopCode, lastCompletedOrder.tokenNumber)}
+                </span>
+              </p>
+            </div>
+
+            {/* Token Badge */}
+            <div className="bg-slate-950 border border-amber-500/40 rounded-2xl p-3 text-center my-3 shadow-inner">
+              <span className="text-[10px] uppercase font-bold text-slate-400">
+                {language === 'ta' ? 'டோக்கன் எண்' : 'TOKEN'}
+              </span>
+              <div className="text-4xl font-black text-amber-400 font-mono">
+                {lastCompletedOrder.tokenNumber}
+              </div>
+            </div>
+
+            {/* Items list */}
+            <div className="bg-white/5 rounded-2xl p-3 max-h-40 overflow-y-auto space-y-1.5 my-3 text-xs">
+              {lastCompletedOrder.items.map((line, idx) => (
+                <div key={idx} className="flex justify-between text-slate-200">
+                  <span>{line.nameTa} × {line.qty}</span>
+                  <span className="font-mono font-bold text-amber-200">{formatPaise(line.totalPaise)}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Total */}
+            <div className="flex justify-between items-center py-2 border-t border-white/10 text-sm">
+              <span className="text-slate-300">{language === 'ta' ? 'மொத்தம்' : 'Total'}:</span>
+              <span className="text-xl font-black text-amber-400 font-display">
+                {formatPaise(lastCompletedOrder.totalPaise)}
+              </span>
+            </div>
+
+            {/* Actions: Download Luxury PDF / Next Bill */}
+            <div className="space-y-2 mt-4">
+              <button
+                onClick={() => generateLuxuryReceiptPdf(lastCompletedOrder, settings)}
+                className="w-full bg-gold-gradient text-slate-950 font-black py-3 rounded-xl shadow-gold-sm hover:brightness-105 transition flex items-center justify-center gap-2 text-xs touch-target"
+              >
+                <Download className="w-4 h-4 text-slate-950" />
+                <span>{language === 'ta' ? '📄 ஆடம்பர பில் PDF பதிவிறக்கு' : 'Download Luxury PDF'}</span>
+              </button>
+
+              <button
+                onClick={() => setShowReceiptModal(false)}
+                className="w-full bg-white/10 hover:bg-white/15 text-slate-200 font-bold py-2.5 rounded-xl transition text-xs touch-target"
+              >
+                {language === 'ta' ? 'அடுத்த பில் போடவும்' : 'Next Bill'}
               </button>
             </div>
           </div>

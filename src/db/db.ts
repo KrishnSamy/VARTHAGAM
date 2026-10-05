@@ -35,6 +35,7 @@ export interface MenuItem {
   category: string;
   pricePaise: number; // Integer paise
   emoji: string;
+  imageUrl?: string; // Base64 compressed image data URL
   available: boolean;
   morningOnly?: boolean;
   sortOrder: number;
@@ -63,6 +64,7 @@ export interface OrderItemLine {
 export interface OrderBill {
   id: string; // UUID or timestamp based
   tokenNumber: string; // e.g. "T-014"
+  billNumber?: string; // Formatted with shop code, e.g. "CHE01-261005-014"
   items: OrderItemLine[];
   totalPaise: number; // Recomputed locally, never trusted from client
   payMode: 'cash' | 'upi';
